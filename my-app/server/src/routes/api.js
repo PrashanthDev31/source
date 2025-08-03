@@ -32,10 +32,11 @@ router.get('/marketplace', async (req, res) => {
     const { search } = req.query;
     try {
         const pool = await poolPromise;
+        // Replace the existing SQL query in the GET /marketplace route
         let query = `
             SELECT 
                 m.id, m.title, m.price, m.location, m.createdAt, u.name as sellerName, u.id as sellerId,
-                (SELECT STRING_AGG(li.imageUrl, ',') WITHIN GROUP (ORDER BY li.id) FROM listing_images li WHERE li.listingId = m.id) as imageUrls
+                (SELECT li.imageUrl FROM listing_images li WHERE li.listingId = m.id FOR JSON PATH) as imageUrls
             FROM marketplace_listings m
             JOIN users u ON m.userId = u.id
         `;
@@ -48,7 +49,8 @@ router.get('/marketplace', async (req, res) => {
         const result = await request.query(query);
         const listings = result.recordset.map(listing => ({
             ...listing,
-            imageUrls: listing.imageUrls ? listing.imageUrls.split(',') : []
+            // Parse the JSON string from SQL and map it to a simple array of URLs
+            imageUrls: listing.imageUrls ? JSON.parse(listing.imageUrls).map(img => img.imageUrl) : []
         }));
         res.json(listings);
     } catch (err) {

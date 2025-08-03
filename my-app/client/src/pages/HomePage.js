@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 const Logo = () => (
     <div className="flex items-center space-x-3">
         <img 
-            src="https://desicirclestorage.blob.core.windows.net/websupporting-images/Logo.png" 
+            src="https://desiconnectstorage.blob.core.windows.net/logo/logo.png" 
             alt="DesiConnect Logo" 
             className="h-8 w-auto" // You can adjust the height (h-8) as needed
         />

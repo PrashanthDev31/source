@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
- 
-//console
+import { useNavigate } from 'react-router-dom';
 
 const SpinnerIcon = ({ color = 'text-white' }) => (
     <svg className={`animate-spin -ml-1 mr-3 h-5 w-5 ${color}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -10,8 +9,10 @@ const SpinnerIcon = ({ color = 'text-white' }) => (
     </svg>
 );
 
-function LoginPage({ onNavigate, onLogin }) {
+function LoginPage({ onLogin }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const navigate = useNavigate();
+
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setIsLoggingIn(true);
@@ -39,7 +40,7 @@ function LoginPage({ onNavigate, onLogin }) {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col justify-center items-center p-4">
       <div className="absolute top-4 left-4">
-        <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
+        <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
       </div>
       <div className="bg-white shadow-2xl rounded-2xl p-8 sm:p-12 w-full max-w-md text-center">
         <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">Welcome!</h1>

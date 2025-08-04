@@ -47,41 +47,39 @@ io.on('connection', (socket) => {
     });
 
     // Event for a user sending a message
-    socket.on('send_message', async ({ conversationId, text }) => {
+    // This event handler now accepts an optional listingContext
+    socket.on('send_message', async ({ conversationId, text, listingContext }) => {
         try {
             const senderId = socket.user.id;
 
-            // 1. Create the message object
             const message = {
                 senderId: senderId,
                 text: text,
             };
 
-            // 2. Find the conversation and push the new message
+            // If context is provided, add it to the message
+            if (listingContext && listingContext.listingId && listingContext.listingTitle) {
+                message.listingContext = listingContext;
+            }
+
             const updatedConversation = await Conversation.findByIdAndUpdate(
                 conversationId,
                 { $push: { messages: message } },
-                { new: true } // Return the updated document
+                { new: true }
             );
 
-            if (!updatedConversation) {
-                // Handle case where conversation isn't found
-                return;
-            }
+            if (!updatedConversation) return;
 
-            // The newly added message is the last one in the array
             const newMessage = updatedConversation.messages[updatedConversation.messages.length - 1];
 
-            // 3. Broadcast the new message to all clients in the room
             io.to(conversationId).emit('new_message', newMessage);
 
         } catch (error) {
             console.error('Error handling send_message event:', error);
-            // Optionally emit an error back to the sender
-            // socket.emit('message_error', { message: 'Failed to send message.' });
         }
     });
 
+    
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.user.name}`);
     });

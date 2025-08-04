@@ -1,24 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-function OrderSuccessPage({ onNavigate, token, onOrderFinalized }) {
-    const [status, setStatus] = useState('loading'); // loading, success, error
+function OrderSuccessPage({ token, onOrderFinalized }) {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [status, setStatus] = useState('loading'); 
     const [orderId, setOrderId] = useState(null);
-    
-    // --- FIX ---
-    // Use a ref to prevent the finalizeOrder function from running more than once.
-    // This is the key to solving the race condition.
     const hasFinalized = useRef(false);
 
     useEffect(() => {
         const finalizeOrder = async () => {
-            // If we have already tried to finalize, do nothing.
-            if (hasFinalized.current) {
-                return;
-            }
-            // Set the lock to true immediately.
+            if (hasFinalized.current) return;
             hasFinalized.current = true;
 
-            const urlParams = new URLSearchParams(window.location.search);
+            const urlParams = new URLSearchParams(location.search);
             const paymentIntentId = urlParams.get('payment_intent');
 
             if (!paymentIntentId) {
@@ -41,19 +36,18 @@ function OrderSuccessPage({ onNavigate, token, onOrderFinalized }) {
                 setOrderId(data.orderId);
                 setStatus('success');
                 onOrderFinalized();
-                // Clean up the URL to prevent issues on refresh.
-                window.history.replaceState({}, document.title, "/");
+                // Clean up the URL
+                navigate('/order-success', { replace: true });
             } catch (error) {
                 console.error("Error finalizing order:", error);
                 setStatus('error');
             }
         };
 
-        // Only attempt to finalize the order AFTER the token has been loaded.
         if (token) {
             finalizeOrder();
         }
-    }, [token, onOrderFinalized]);
+    }, [token, onOrderFinalized, location.search, navigate]);
 
     const renderContent = () => {
         switch (status) {
@@ -84,8 +78,8 @@ function OrderSuccessPage({ onNavigate, token, onOrderFinalized }) {
                 <p className="text-gray-600">{body}</p>
                 {status !== 'loading' && (
                     <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                        <button onClick={() => onNavigate('home')} className="w-full py-3 px-6 bg-purple-600 text-white font-bold rounded-lg shadow-md hover:bg-purple-700 transition-colors">Continue Shopping</button>
-                        <button onClick={() => onNavigate('order-history')} className="w-full py-3 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-colors">View Order History</button>
+                        <button onClick={() => navigate('/')} className="w-full py-3 px-6 bg-purple-600 text-white font-bold rounded-lg shadow-md hover:bg-purple-700 transition-colors">Continue Shopping</button>
+                        <button onClick={() => navigate('/order-history')} className="w-full py-3 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-colors">View Order History</button>
                     </div>
                 )}
             </div>

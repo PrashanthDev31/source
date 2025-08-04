@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 
-function OrderHistoryPage({ onNavigate, token }) {
+function OrderHistoryPage({ token }) {
+    const navigate = useNavigate();
     const [orders, setOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -24,27 +26,22 @@ function OrderHistoryPage({ onNavigate, token }) {
     }, [token]);
 
     const handleDownloadPdf = (order) => {
-        // Create a new PDF document
         const doc = new jsPDF();
 
-        // --- Add Header ---
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
         doc.text('YourLogo Inc.', 20, 20);
         doc.setFontSize(16);
         doc.text('Order Receipt', 20, 30);
         
-        // --- Add Order Details ---
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
         doc.text(`Order ID: #${order.id}`, 20, 45);
         doc.text(`Order Date: ${new Date(order.date).toLocaleDateString()}`, 20, 52);
 
-        // --- Add a line separator ---
         doc.setLineWidth(0.5);
         doc.line(20, 60, 190, 60);
 
-        // --- Add Table Header ---
         doc.setFont('helvetica', 'bold');
         doc.text('Item', 20, 70);
         doc.text('Qty', 130, 70);
@@ -52,7 +49,6 @@ function OrderHistoryPage({ onNavigate, token }) {
         doc.text('Subtotal', 170, 70);
         doc.setFont('helvetica', 'normal');
         
-        // --- Add Order Items ---
         let yPosition = 80;
         order.items.forEach(item => {
             doc.text(item.name, 20, yPosition);
@@ -62,20 +58,16 @@ function OrderHistoryPage({ onNavigate, token }) {
             yPosition += 7;
         });
 
-        // --- Add another line separator ---
         doc.line(20, yPosition, 190, yPosition);
 
-        // --- Add Total ---
         doc.setFont('helvetica', 'bold');
         doc.text('Total:', 150, yPosition + 10);
         doc.text(`$${parseFloat(order.total).toFixed(2)}`, 170, yPosition + 10);
 
-        // --- Add Footer ---
         doc.setFontSize(10);
         doc.setTextColor(150);
         doc.text('Thank you for your business!', 20, yPosition + 30);
 
-        // --- Save the PDF ---
         doc.save(`receipt-order-${order.id}.pdf`);
     };
 
@@ -83,7 +75,7 @@ function OrderHistoryPage({ onNavigate, token }) {
         <div className="min-h-screen bg-gray-100">
             <header className="bg-white shadow-sm">
                 <div className="container mx-auto px-6 py-4">
-                    <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
+                    <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
                 </div>
             </header>
             <main className="container mx-auto px-6 py-12">

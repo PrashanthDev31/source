@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { useNavigate } from 'react-router-dom';
 
-// You must paste your Stripe Publishable Key here for this component to work.
 const STRIPE_PUBLISHABLE_KEY = "pk_test_51Rok6wRqzu5xWulF2IxdbyErvsbE48UeX8JtQfcOVFF26wf6NYRSSRRx1rOT50XVaD0qzg2WZAQ12O6oOU8FZpx400FuCqJJ0i";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
@@ -13,7 +13,6 @@ const SpinnerIcon = ({ color = 'text-white' }) => (
     </svg>
 );
 
-// The CheckoutForm now accepts an `isCartEmpty` prop to control the button.
 function CheckoutForm({ isCartEmpty }) {
     const stripe = useStripe();
     const elements = useElements();
@@ -45,8 +44,6 @@ function CheckoutForm({ isCartEmpty }) {
         <form id="payment-form" onSubmit={handleSubmit}>
             <PaymentElement id="payment-element" />
             <button 
-                // --- FIX ---
-                // The button is now also disabled if the cart is empty.
                 disabled={isLoading || !stripe || !elements || isCartEmpty} 
                 id="submit" 
                 className="w-full mt-6 py-3 px-4 bg-purple-600 text-white font-bold rounded-lg shadow-md hover:bg-purple-700 transition-colors disabled:bg-gray-400 flex items-center justify-center"
@@ -58,7 +55,8 @@ function CheckoutForm({ isCartEmpty }) {
     );
 }
 
-function CheckoutPage({ onNavigate, cart, onUpdateCart, token }) {
+function CheckoutPage({ cart, onUpdateCart, token }) {
+    const navigate = useNavigate();
     const [clientSecret, setClientSecret] = useState("");
     
     useEffect(() => {
@@ -95,7 +93,7 @@ function CheckoutPage({ onNavigate, cart, onUpdateCart, token }) {
         <div className="min-h-screen bg-gray-100">
             <header className="bg-white shadow-sm">
                 <div className="container mx-auto px-6 py-4">
-                    <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Shopping</button>
+                    <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Shopping</button>
                 </div>
             </header>
             <main className="container mx-auto px-6 py-12">

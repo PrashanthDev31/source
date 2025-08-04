@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Import Page Components
-import InboxPage from './pages/InboxPage';
-import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import AdvertisementPlanPage from './pages/AdvertisementPlanPage';
@@ -11,38 +10,44 @@ import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import MarketplacePage from './pages/MarketplacePage';
+import InboxPage from './pages/InboxPage';
+import ChatPage from './pages/ChatPage';
 
-// --- IMPORTANT: PASTE YOUR GOOGLE CLIENT ID HERE ---
 const GOOGLE_CLIENT_ID = "117194583119-ipg9t7ohp034hfapg6h0s3ohja0ajdbj.apps.googleusercontent.com";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('home');
-  const [pageData, setPageData] = useState({});
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [cart, setCart] = useState([]);
   const [isCartAnimating, setIsCartAnimating] = useState(false);
+  const navigate = useNavigate();
 
+  // This effect handles the redirect from Stripe after payment
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('payment_intent')) {
-        setCurrentPage('order-success');
+      navigate('/order-success?' + urlParams.toString());
     }
-  }, []);
+  }, [navigate]);
 
   const handleLogout = useCallback(() => {
     setUser(null);
     setToken(null);
     setCart([]);
     localStorage.removeItem('token');
-    setCurrentPage('home'); 
-  }, []);
+    navigate('/'); 
+  }, [navigate]);
 
   useEffect(() => {
     const bootstrap = async () => {
       if (token) {
         try {
           const decodedToken = JSON.parse(atob(token.split('.')[1]));
+          const tokenExp = decodedToken.exp * 1000;
+          if (Date.now() >= tokenExp) {
+            handleLogout();
+            return;
+          }
           setUser({ id: decodedToken.id, name: decodedToken.name });
           
           const response = await fetch('http://localhost:8000/api/cart', {
@@ -64,11 +69,6 @@ function App() {
     bootstrap();
   }, [token, handleLogout]);
 
-  const handleNavigation = useCallback((page, data = {}) => {
-      setPageData(data);
-      setCurrentPage(page);
-  }, []);
-
   const handleLogin = useCallback(async (googleUserInfo) => {
     try {
       const response = await fetch('http://localhost:8000/api/auth/google', {
@@ -86,12 +86,11 @@ function App() {
       setUser(data.user);
       setToken(data.token);
       localStorage.setItem('token', data.token);
-      
-      setCurrentPage('home');
+      navigate('/');
     } catch (error) {
       console.error("Error during backend authentication:", error);
     }
-  }, []);
+  }, [navigate]);
 
   const triggerCartAnimation = useCallback(() => {
     setIsCartAnimating(true);
@@ -100,7 +99,7 @@ function App() {
 
   const handleAddToCart = useCallback(async (itemsToAdd) => {
     if (!token) {
-        handleNavigation('login');
+        navigate('/login');
         return;
     }
     try {
@@ -120,7 +119,7 @@ function App() {
     } catch (error) {
       console.error("Error adding to cart:", error);
     }
-  }, [token, handleNavigation, triggerCartAnimation]);
+  }, [token, navigate, triggerCartAnimation]);
   
   const handleUpdateCart = useCallback(async (itemName, newQuantity) => {
     if (!token) return;
@@ -151,33 +150,19 @@ function App() {
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const isAuthenticated = !!token;
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'login':
-        return <LoginPage onNavigate={handleNavigation} onLogin={handleLogin} />;
-      case 'advertisement':
-        return <AdvertisementPlanPage onNavigate={handleNavigation} onAddToCart={handleAddToCart} onUpdateCart={handleUpdateCart} cart={cart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} />;
-      case 'checkout':
-        return <CheckoutPage onNavigate={handleNavigation} cart={cart} onUpdateCart={handleUpdateCart} token={token} />;
-      case 'inbox':
-        return <InboxPage onNavigate={handleNavigation} token={token} />;
-      case 'chat':
-        return <ChatPage onNavigate={handleNavigation} token={token} pageData={pageData} user={user} />;
-      case 'order-success':
-        return <OrderSuccessPage onNavigate={handleNavigation} token={token} onOrderFinalized={handleOrderFinalized} />;
-      case 'order-history':
-        return <OrderHistoryPage onNavigate={handleNavigation} token={token} />;
-      case 'marketplace':
-        return <MarketplacePage onNavigate={handleNavigation} token={token} user={user} />;
-      case 'home':
-      default:
-        return <HomePage onNavigate={handleNavigation} isAuthenticated={isAuthenticated} onLogout={handleLogout} onAddToCart={handleAddToCart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} user={user} />;
-    }
-  };
-
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      {renderPage()}
+      <Routes>
+        <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} onLogout={handleLogout} onAddToCart={handleAddToCart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} user={user} />} />
+        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+        <Route path="/advertisement" element={<AdvertisementPlanPage onAddToCart={handleAddToCart} onUpdateCart={handleUpdateCart} cart={cart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} />} />
+        <Route path="/checkout" element={<CheckoutPage cart={cart} onUpdateCart={handleUpdateCart} token={token} />} />
+        <Route path="/order-success" element={<OrderSuccessPage token={token} onOrderFinalized={handleOrderFinalized} />} />
+        <Route path="/order-history" element={<OrderHistoryPage token={token} />} />
+        <Route path="/marketplace" element={<MarketplacePage token={token} user={user} />} />
+        <Route path="/inbox" element={<InboxPage token={token} />} />
+        <Route path="/inbox/:conversationId" element={<ChatPage token={token} user={user} />} />
+      </Routes>
     </GoogleOAuthProvider>
   );
 }

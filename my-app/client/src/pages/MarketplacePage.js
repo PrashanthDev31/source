@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const SpinnerIcon = ({ color = 'text-white' }) => (
     <svg className={`animate-spin -ml-1 mr-3 h-5 w-5 ${color}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -7,7 +8,6 @@ const SpinnerIcon = ({ color = 'text-white' }) => (
     </svg>
 );
 
-// --- Camera Modal Component ---
 const CameraModal = ({ onClose, onCapture }) => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -24,7 +24,7 @@ const CameraModal = ({ onClose, onCapture }) => {
                 }
             } catch (err) {
                 console.error("Error accessing camera:", err);
-                onClose(); // Close modal if camera access is denied
+                onClose();
             }
         };
         if (!capturedImage) {
@@ -48,7 +48,7 @@ const CameraModal = ({ onClose, onCapture }) => {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageUrl = canvas.toDataURL('image/jpeg');
             setCapturedImage(imageUrl);
-            stream.getTracks().forEach(track => track.stop()); // Stop camera feed
+            stream.getTracks().forEach(track => track.stop());
         }
     };
 
@@ -94,15 +94,14 @@ const CameraModal = ({ onClose, onCapture }) => {
     );
 };
 
-
-function MarketplacePage({ onNavigate, token, user }) {
+function MarketplacePage({ token, user }) {
+    const navigate = useNavigate();
     const [listings, setListings] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showCamera, setShowCamera] = useState(false);
 
-    // Form state
     const [title, setTitle] = useState('');
     const [location, setLocation] = useState('');
     const [price, setPrice] = useState('');
@@ -144,34 +143,38 @@ function MarketplacePage({ onNavigate, token, user }) {
         setShowCamera(false);
     };
     
-    // Replace the old handleContactSeller function
-const handleContactSeller = async (listing) => {
-    if (!token) {
-        onNavigate('login');
-        return;
-    }
-    try {
-        const response = await fetch('http://localhost:8000/api/conversations/find-or-create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                listingId: listing.id,
-                sellerId: listing.sellerId
-            })
-        });
-        if (!response.ok) throw new Error('Could not start conversation');
-        
-        const conversation = await response.json();
-        onNavigate('chat', { conversationId: conversation._id });
+    const handleContactSeller = async (listing) => {
+        if (!token) {
+            navigate('/login');
+            return;
+        }
+        try {
+            const response = await fetch('http://localhost:8000/api/conversations/find-or-create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    sellerId: listing.sellerId
+                })
+            });
+            if (!response.ok) throw new Error('Could not start conversation');
+            
+            const conversation = await response.json();
+            navigate(`/inbox/${conversation._id}`, {
+                state: {
+                    listingContext: {
+                        listingId: listing.id,
+                        listingTitle: listing.title
+                    }
+                }
+            });
 
-    } catch (err) {
-        console.error("Error starting conversation:", err);
-        // You might want to show an error to the user here
-    }
-};
+        } catch (err) {
+            console.error("Error starting conversation:", err);
+        }
+    };
 
     const handleCreateListing = async (e) => {
         e.preventDefault();
@@ -228,13 +231,12 @@ const handleContactSeller = async (listing) => {
         }
     };
 
-
     return (
         <div className="min-h-screen bg-gray-100">
             {showCamera && <CameraModal onClose={() => setShowCamera(false)} onCapture={handleCameraCapture} />}
             <header className="bg-white shadow-sm">
                 <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-                    <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
+                    <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
                     {token && (
                          <button onClick={() => setShowCreateForm(!showCreateForm)} className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition-colors">
                             {showCreateForm ? 'Cancel' : '+ Create Listing'}

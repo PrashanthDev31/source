@@ -9,6 +9,20 @@
       name="description"
       content="Web site created with Gemini"
     />
+
+    <!--
+      Content Security Policy to allow necessary external resources.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self'; 
+      script-src 'self' 'unsafe-inline' https://apis.google.com https://cdn.tailwindcss.com https://js.stripe.com https://accounts.google.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: https:;
+      connect-src 'self' http://localhost:8000 https://www.googleapis.com https://api.stripe.com;
+      frame-src 'self' https://accounts.google.com https://js.stripe.com;
+    ">
+
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     

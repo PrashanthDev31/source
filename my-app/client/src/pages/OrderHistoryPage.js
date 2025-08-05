@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 
-function OrderHistoryPage({ token }) {
-    const navigate = useNavigate();
+// The component now correctly accepts 'onNavigate' as a prop
+function OrderHistoryPage({ onNavigate, token }) {
     const [orders, setOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -27,28 +26,23 @@ function OrderHistoryPage({ token }) {
 
     const handleDownloadPdf = (order) => {
         const doc = new jsPDF();
-
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
         doc.text('YourLogo Inc.', 20, 20);
         doc.setFontSize(16);
         doc.text('Order Receipt', 20, 30);
-        
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
         doc.text(`Order ID: #${order.id}`, 20, 45);
         doc.text(`Order Date: ${new Date(order.date).toLocaleDateString()}`, 20, 52);
-
         doc.setLineWidth(0.5);
         doc.line(20, 60, 190, 60);
-
         doc.setFont('helvetica', 'bold');
         doc.text('Item', 20, 70);
         doc.text('Qty', 130, 70);
         doc.text('Price', 150, 70);
         doc.text('Subtotal', 170, 70);
         doc.setFont('helvetica', 'normal');
-        
         let yPosition = 80;
         order.items.forEach(item => {
             doc.text(item.name, 20, yPosition);
@@ -57,17 +51,13 @@ function OrderHistoryPage({ token }) {
             doc.text(`$${(item.price * item.quantity).toFixed(2)}`, 170, yPosition);
             yPosition += 7;
         });
-
         doc.line(20, yPosition, 190, yPosition);
-
         doc.setFont('helvetica', 'bold');
         doc.text('Total:', 150, yPosition + 10);
         doc.text(`$${parseFloat(order.total).toFixed(2)}`, 170, yPosition + 10);
-
         doc.setFontSize(10);
         doc.setTextColor(150);
         doc.text('Thank you for your business!', 20, yPosition + 30);
-
         doc.save(`receipt-order-${order.id}.pdf`);
     };
 
@@ -75,7 +65,8 @@ function OrderHistoryPage({ token }) {
         <div className="min-h-screen bg-gray-100">
             <header className="bg-white shadow-sm">
                 <div className="container mx-auto px-6 py-4">
-                    <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
+                    {/* This button now correctly calls onNavigate('home') */}
+                    <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
                 </div>
             </header>
             <main className="container mx-auto px-6 py-12">

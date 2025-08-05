@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 const SpinnerIcon = ({ color = 'text-white' }) => (
     <svg className={`animate-spin -ml-1 mr-3 h-5 w-5 ${color}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -94,8 +93,7 @@ const CameraModal = ({ onClose, onCapture }) => {
     );
 };
 
-function MarketplacePage({ token, user }) {
-    const navigate = useNavigate();
+function MarketplacePage({ onNavigate, token, user }) {
     const [listings, setListings] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -143,37 +141,13 @@ function MarketplacePage({ token, user }) {
         setShowCamera(false);
     };
     
-    const handleContactSeller = async (listing) => {
+    const handleContactSeller = (listing) => {
         if (!token) {
-            navigate('/login');
+            onNavigate('login');
             return;
         }
-        try {
-            const response = await fetch('http://localhost:8000/api/conversations/find-or-create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    sellerId: listing.sellerId
-                })
-            });
-            if (!response.ok) throw new Error('Could not start conversation');
-            
-            const conversation = await response.json();
-            navigate(`/inbox/${conversation._id}`, {
-                state: {
-                    listingContext: {
-                        listingId: listing.id,
-                        listingTitle: listing.title
-                    }
-                }
-            });
-
-        } catch (err) {
-            console.error("Error starting conversation:", err);
-        }
+        // Placeholder for future chat implementation
+        alert("Chat functionality is coming soon!");
     };
 
     const handleCreateListing = async (e) => {
@@ -236,7 +210,7 @@ function MarketplacePage({ token, user }) {
             {showCamera && <CameraModal onClose={() => setShowCamera(false)} onCapture={handleCameraCapture} />}
             <header className="bg-white shadow-sm">
                 <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-                    <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
+                    <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
                     {token && (
                          <button onClick={() => setShowCreateForm(!showCreateForm)} className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition-colors">
                             {showCreateForm ? 'Cancel' : '+ Create Listing'}

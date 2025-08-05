@@ -6,7 +6,6 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const multer = require('multer');
 const { BlobServiceClient } = require('@azure/storage-blob');
 const { v4: uuidv4 } = require('uuid');
-const { Conversation } = require('../models/ChatModels');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -18,8 +17,6 @@ const upload = multer({ storage: storage });
 
 const PRODUCT_PRICES = { 'Modern Desk Lamp': 79.99, 'Ergonomic Chair': 349.99, 'Wireless Headphones': 199.99, 'Smart Mug': 129.99, 'Basic Ad (monthly)': 69.99, 'Standard Ad (monthly)': 129.99, };
 const authenticateToken = (req, res, next) => { const authHeader = req.headers['authorization']; const token = authHeader && authHeader.split(' ')[1]; if (token == null) return res.sendStatus(401); jwt.verify(token, JWT_SECRET, (err, user) => { if (err) return res.sendStatus(403); req.user = user; next(); }); };
-
-// --- AUTH & E-COMMERCE ENDPOINTS ---
 
 router.post('/auth/google', async (req, res) => { const { googleId, email, name } = req.body; if (!googleId || !email || !name) { return res.status(400).json({ message: 'Missing required user information.' }); } try { const pool = await poolPromise; let request = pool.request(); let result = await request.input('googleId', sql.NVarChar, googleId).input('email', sql.NVarChar, email).query('SELECT * FROM users WHERE googleId = @googleId OR email = @email'); let user = result.recordset[0]; if (!user) { let insertRequest = pool.request(); result = await insertRequest.input('googleId_insert', sql.NVarChar, googleId).input('email_insert', sql.NVarChar, email).input('name_insert', sql.NVarChar, name).query('INSERT INTO users (googleId, email, name) OUTPUT INSERTED.* VALUES (@googleId_insert, @email_insert, @name_insert)'); user = result.recordset[0]; } const token = jwt.sign({ id: user.id, name: user.name }, JWT_SECRET, { expiresIn: '1d' }); res.status(200).json({ message: 'Authentication successful!', user: user, token: token }); } catch (err) { console.error('API Auth Error:', err); res.status(500).json({ message: 'An error occurred during authentication.' }); } });
 router.get('/cart', authenticateToken, async (req, res) => { try { const pool = await poolPromise; const result = await pool.request().input('userId', sql.Int, req.user.id).query('SELECT * FROM cart_items WHERE userId = @userId'); res.json(result.recordset); } catch (err) { res.status(500).json({ message: 'Failed to retrieve cart.' }); } });
@@ -89,7 +86,6 @@ router.post('/marketplace', authenticateToken, async (req, res) => {
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
-        
         const listingRequest = new sql.Request(transaction);
         const listingResult = await listingRequest
             .input('userId', sql.Int, req.user.id)
@@ -116,129 +112,6 @@ router.post('/marketplace', authenticateToken, async (req, res) => {
         await transaction.rollback();
         console.error('API Marketplace POST Error:', err);
         res.status(500).json({ message: 'Failed to create listing.' });
-    }
-});
-
-// --- CHAT ENDPOINTS ---
-
-// --- CHAT ENDPOINTS (REVISED FOR NEW SCHEMA) ---
-
-router.post('/conversations/find-or-create', authenticateToken, async (req, res) => {
-    const { sellerId } = req.body;
-    const buyerId = req.user.id;
-
-    if (buyerId === sellerId) {
-        return res.status(400).json({ message: "You cannot start a conversation with yourself." });
-    }
-
-    try {
-        // Find an active conversation (one the buyer hasn't deleted)
-        let conversation = await Conversation.findOne({
-            'participantsInfo.userId': { $all: [buyerId, sellerId] },
-            'participantsInfo': { $elemMatch: { userId: buyerId, deletedAt: null } }
-        });
-
-        if (conversation) {
-            // Active conversation found
-            return res.status(200).json(conversation);
-        } else {
-            // No active conversation found, create a new one
-            const newConversation = new Conversation({
-                participantsInfo: [
-                    { userId: buyerId, deletedAt: null },
-                    { userId: sellerId, deletedAt: null }
-                ],
-                messages: []
-            });
-            await newConversation.save();
-            return res.status(201).json(newConversation);
-        }
-    } catch (error) {
-        console.error('Find/Create Conversation Error:', error);
-        res.status(500).json({ message: 'Error handling conversation.' });
-    }
-});
-
-router.post('/inbox', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        // Find conversations where the user is a participant AND
-        // either they haven't deleted it, OR new messages have arrived since they deleted it.
-        const conversations = await Conversation.find({
-            'participantsInfo.userId': userId,
-            $or: [
-                // Condition A: User has not deleted the chat (deletedAt is null)
-                { 'participantsInfo': { $elemMatch: { userId: userId, deletedAt: null } } },
-                // Condition B: The conversation's last update is MORE RECENT than the user's deletion time.
-                // This uses a complex query to compare two fields within the same document array element.
-                { 
-                    'participantsInfo': { 
-                        $elemMatch: { 
-                            userId: userId, 
-                            $where: 'this.deletedAt < this.updatedAt' 
-                        } 
-                    }
-                }
-            ]
-        }).sort({ updatedAt: -1 });
-            
-        res.status(200).json(conversations);
-    } catch (error) {
-        console.error('Get Inbox Error:', error);
-        res.status(500).json({ message: 'Error fetching inbox.' });
-    }
-});
-
-router.get('/conversations/:id/messages', authenticateToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user.id;
-        const conversation = await Conversation.findOne({ _id: id, 'participantsInfo.userId': userId });
-
-        if (!conversation) {
-            return res.status(404).json({ message: 'Conversation not found.' });
-        }
-
-        // Find the current user's participant info to get their deletion timestamp
-        const userInfo = conversation.participantsInfo.find(p => p.userId === userId);
-        const deletionTimestamp = userInfo ? userInfo.deletedAt : null;
-
-        let messagesToShow = conversation.messages;
-
-        // If the user has deleted this chat, only show messages created after that time
-        if (deletionTimestamp) {
-            messagesToShow = conversation.messages.filter(
-                msg => msg.createdAt > deletionTimestamp
-            );
-        }
-
-        res.status(200).json(messagesToShow);
-    } catch (error) {
-        console.error('Get Messages Error:', error);
-        res.status(500).json({ message: 'Error fetching messages.' });
-    }
-});
-
-router.put('/conversations/:id/hide', authenticateToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user.id;
-
-        // Find the conversation and update the deletedAt field for the specific user
-        const conversation = await Conversation.findOneAndUpdate(
-            { _id: id, 'participantsInfo.userId': userId },
-            { $set: { 'participantsInfo.$.deletedAt': new Date() } },
-            { new: true }
-        );
-
-        if (!conversation) {
-            return res.status(404).json({ message: "Conversation not found or you are not a participant." });
-        }
-
-        res.status(200).json({ message: "Conversation hidden successfully." });
-    } catch (error) {
-        console.error('Hide Conversation Error:', error);
-        res.status(500).json({ message: 'Error hiding conversation.' });
     }
 });
 

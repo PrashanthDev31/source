@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// Make sure BrowserRouter is imported if you use <Router>, but we will remove it from here.
+import { Routes, Route, useNavigate } from 'react-router-dom'; 
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Pages
@@ -14,18 +15,22 @@ import ChatPage from './pages/ChatPage';
 
 const GOOGLE_CLIENT_ID = "117194583119-ipg9t7ohp034hfapg6h0s3ohja0ajdbj.apps.googleusercontent.com";
 
-function App() {
+// NOTE: We need to create a component that is a child of the Router to use the useNavigate hook.
+// So we'll have AppContent and then App which is wrapped in the Router in index.js
+function AppContent() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [cart, setCart] = useState([]);
   const [isCartAnimating, setIsCartAnimating] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogout = useCallback(() => {
     setUser(null);
     setToken(null);
     setCart([]);
     localStorage.removeItem('token');
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
   useEffect(() => {
     if (token) {
@@ -65,13 +70,15 @@ function App() {
       if (!response.ok) throw new Error('Backend authentication failed');
       const data = await response.json();
       
-      setUser(data.user);
       setToken(data.token);
+      setUser(data.user);
       localStorage.setItem('token', data.token);
+      navigate('/');
+      
     } catch (error) {
       console.error("Error during backend authentication:", error);
     }
-  }, []);
+  }, [navigate]);
 
   const triggerCartAnimation = useCallback(() => {
     setIsCartAnimating(true);
@@ -79,7 +86,10 @@ function App() {
   }, []);
 
   const handleAddToCart = useCallback(async (itemsToAdd) => {
-    if (!token) return;
+    if (!token) {
+        navigate('/login');
+        return;
+    }
     try {
       const response = await fetch('http://localhost:8000/api/cart', {
         method: 'POST',
@@ -97,7 +107,7 @@ function App() {
     } catch (error) {
       console.error("Error adding to cart:", error);
     }
-  }, [token, triggerCartAnimation]);
+  }, [token, navigate, triggerCartAnimation]);
 
   const handleUpdateCart = useCallback(async (itemName, newQuantity) => {
     if (!token) return;
@@ -130,21 +140,27 @@ function App() {
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      
-        <Routes>
-          <Route path="/" element={<Navigate to="/home" />} />
-          <Route path="/home" element={<HomePage isAuthenticated={isAuthenticated} onLogout={handleLogout} onAddToCart={handleAddToCart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} user={user} />} />
-          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-          <Route path="/advertisement" element={<AdvertisementPlanPage onAddToCart={handleAddToCart} onUpdateCart={handleUpdateCart} cart={cart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} />} />
-          <Route path="/checkout" element={<CheckoutPage cart={cart} onUpdateCart={handleUpdateCart} token={token} />} />
-          <Route path="/order-success" element={<OrderSuccessPage token={token} onOrderFinalized={handleOrderFinalized} />} />
-          <Route path="/order-history" element={<OrderHistoryPage token={token} />} />
-          <Route path="/marketplace" element={<MarketplacePage token={token} user={user} />} />
-          <Route path="/chat/:sellerId" element={<ChatPage />} />
-        </Routes>
-      
+      <Routes>
+        <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} onLogout={handleLogout} onAddToCart={handleAddToCart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} user={user} />} />
+        {/* Redirect base path to /home for consistency */}
+        <Route path="/home" element={<HomePage isAuthenticated={isAuthenticated} onLogout={handleLogout} onAddToCart={handleAddToCart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} user={user} />} />
+        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+        <Route path="/advertisement" element={<AdvertisementPlanPage onAddToCart={handleAddToCart} onUpdateCart={handleUpdateCart} cart={cart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} />} />
+        <Route path="/checkout" element={<CheckoutPage cart={cart} onUpdateCart={handleUpdateCart} token={token} />} />
+        <Route path="/order-success" element={<OrderSuccessPage token={token} onOrderFinalized={handleOrderFinalized} />} />
+        <Route path="/order-history" element={<OrderHistoryPage token={token} />} />
+        <Route path="/marketplace" element={<MarketplacePage token={token} user={user} />} />
+        <Route path="/chat/:sellerId" element={<ChatPage />} />
+      </Routes>
     </GoogleOAuthProvider>
   );
+}
+
+
+// The actual App component that will be exported.
+// The Router is in index.js, so we just need to render the AppContent.
+function App() {
+  return <AppContent />;
 }
 
 export default App;

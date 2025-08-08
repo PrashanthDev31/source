@@ -9,57 +9,40 @@ const SpinnerIcon = ({ color = 'text-white' }) => (
     </svg>
 );
 
+// We've removed onNavigate and now use the onLogin prop from App.js
 function LoginPage({ onLogin }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const navigate = useNavigate();
 
   const handleGoogleLogin = useGoogleLogin({
-
     onSuccess: async (tokenResponse) => {
-  setIsLoggingIn(true);
-  try {
-    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-    });
-
-    if (!userInfoResponse.ok) throw new Error('Failed to fetch user info from Google');
-
-    const userInfo = await userInfoResponse.json();
-
-    // 🔽 Send to your backend for login/registration
-    const backendResponse = await fetch('/api/auth/google', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userInfo })  // or send token instead if you validate on backend
-    });
-
-    if (!backendResponse.ok) throw new Error('Backend auth failed');
-
-    const session = await backendResponse.json(); // e.g., { user: {...}, token: '...' }
-
-    await onLogin(session.user);  // 🔁 Login success
-  } catch (error) {
-    console.error("Google Login Error:", error);
-    setIsLoggingIn(false);
-  }
-}
-
-    
-    ,
+      setIsLoggingIn(true);
+      try {
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        if (!userInfoResponse.ok) throw new Error('Failed to fetch user info from Google');
+        const userInfo = await userInfoResponse.json();
+        
+        // This is the function passed from App.js that will handle the backend call
+        await onLogin(userInfo); 
+        
+        // After successful login in App.js, it will handle navigation
+      } catch (error) {
+        console.error("Error fetching user info from Google:", error);
+        setIsLoggingIn(false); // Make sure to turn off loading on error
+      }
+    },
     onError: (errorResponse) => {
         console.error("Google Login Error:", errorResponse);
         setIsLoggingIn(false);
     },
-    onNonOAuthError: () => {
-        setIsLoggingIn(false);
-    }
   });
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col justify-center items-center p-4">
       <div className="absolute top-4 left-4">
+        {/* useNavigate is now used to go back to the home page */}
         <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
       </div>
       <div className="bg-white shadow-2xl rounded-2xl p-8 sm:p-12 w-full max-w-md text-center">

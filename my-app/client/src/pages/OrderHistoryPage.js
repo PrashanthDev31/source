@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // <-- Import useNavigate
 import jsPDF from 'jspdf';
 
-// The component now correctly accepts 'onNavigate' as a prop
-function OrderHistoryPage({ onNavigate, token }) {
+// The component no longer needs the 'onNavigate' prop
+function OrderHistoryPage({ token }) {
+    const navigate = useNavigate(); // <-- Initialize the navigate function
     const [orders, setOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchOrders = async () => {
+            if (!token) return;
             try {
                 const response = await fetch('http://localhost:8000/api/orders', {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -21,14 +24,14 @@ function OrderHistoryPage({ onNavigate, token }) {
                 setIsLoading(false);
             }
         };
-        if (token) fetchOrders();
+        fetchOrders();
     }, [token]);
 
     const handleDownloadPdf = (order) => {
         const doc = new jsPDF();
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
-        doc.text('YourLogo Inc.', 20, 20);
+        doc.text('DesiConnect', 20, 20);
         doc.setFontSize(16);
         doc.text('Order Receipt', 20, 30);
         doc.setFontSize(11);
@@ -65,8 +68,8 @@ function OrderHistoryPage({ onNavigate, token }) {
         <div className="min-h-screen bg-gray-100">
             <header className="bg-white shadow-sm">
                 <div className="container mx-auto px-6 py-4">
-                    {/* This button now correctly calls onNavigate('home') */}
-                    <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
+                    {/* This button now correctly calls navigate('/') */}
+                    <button onClick={() => navigate('/')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
                 </div>
             </header>
             <main className="container mx-auto px-6 py-12">

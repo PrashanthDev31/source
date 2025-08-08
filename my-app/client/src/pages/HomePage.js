@@ -83,9 +83,11 @@ function HomePage({  isAuthenticated, onLogout, onAddToCart, cartItemCount, isCa
             {isAuthenticated ? (
               <div className="hidden md:flex items-center gap-4">
                 <span className="text-gray-700 font-medium">Welcome, {user?.name.split(' ')[0]}</span>
-                <a href="#" onClick={() => navigate('/order-history')} className="text-sm text-purple-600 hover:underline">Order History</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); navigate('/order-history'); }} className="text-sm text-purple-600 hover:underline">Order History</a>
+                {/* --- ADD THIS LINE --- */}
+                <a href="#" onClick={(e) => { e.preventDefault(); navigate('/inbox'); }} className="text-sm text-purple-600 hover:underline">Inbox</a>
                 <button onClick={onLogout} className="flex items-center text-gray-600 hover:text-purple-600">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  {/*... svg icon ...*/}
                   <span className="ml-2 font-medium">Sign Out</span>
                 </button>
               </div>

@@ -12,6 +12,10 @@ import OrderSuccessPage from './pages/OrderSuccessPage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import MarketplacePage from './pages/MarketplacePage';
 import ChatPage from './pages/ChatPage';
+import InboxPage from './pages/InboxPage';
+
+
+
 
 const GOOGLE_CLIENT_ID = "117194583119-ipg9t7ohp034hfapg6h0s3ohja0ajdbj.apps.googleusercontent.com";
 
@@ -151,6 +155,9 @@ function AppContent() {
         <Route path="/order-history" element={<OrderHistoryPage token={token} />} />
         <Route path="/marketplace" element={<MarketplacePage token={token} user={user} />} />
         <Route path="/chat/:sellerId" element={<ChatPage />} />
+        <Route path="/inbox" element={<InboxPage  />} />
+
+        {/* Fallback route for 404 */}
       </Routes>
     </GoogleOAuthProvider>
   );

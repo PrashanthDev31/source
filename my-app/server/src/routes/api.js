@@ -363,6 +363,55 @@ router.get('/messages/:otherUserId', authenticateToken, async (req, res) => {
     }
 });
 
+router.get('/conversations', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id.toString(); // Ensure userId is a string for matching
+
+        // Use the MongoDB Aggregation Pipeline to get the last message for each chat room
+        const conversations = await Message.aggregate([
+            // Find all messages where the current user is either the sender or receiver
+            { $match: { $or: [{ senderId: userId }, { receiverId: userId }] } },
+            // Sort messages within each room to get the most recent one first
+            { $sort: { sentAt: -1 } },
+            // Group by the room ID to get the last message for each conversation
+            { 
+                $group: { 
+                    _id: "$room",
+                    lastMessage: { $first: "$$ROOT" }
+                } 
+            },
+            // Sort the conversations themselves by the last message's date
+            { $sort: { "lastMessage.sentAt": -1 } }
+        ]);
+
+        // We need to get the names of the other users from our SQL database
+        const pool = await poolPromise;
+        let finalConversations = [];
+
+        for (let convo of conversations) {
+            const lastMsg = convo.lastMessage;
+            const otherUserId = lastMsg.senderId === userId ? lastMsg.receiverId : lastMsg.senderId;
+            
+            // Query the SQL 'users' table for the other user's name
+            const userResult = await pool.request()
+                .input('userId', sql.Int, parseInt(otherUserId))
+                .query('SELECT name FROM users WHERE id = @userId');
+            
+            finalConversations.push({
+                otherUserId: parseInt(otherUserId),
+                otherUserName: userResult.recordset.length > 0 ? userResult.recordset[0].name : "Unknown User",
+                lastMessageText: lastMsg.text,
+                lastMessageDate: lastMsg.sentAt
+            });
+        }
+        
+        res.json(finalConversations);
+    } catch (err) {
+        console.error("Error fetching conversations:", err);
+        res.status(500).json({ error: 'Failed to fetch conversations' });
+    }
+});
+
 router.post('/messages', authenticateToken, async (req, res) => {
     try {
         const { otherUserId, text } = req.body;

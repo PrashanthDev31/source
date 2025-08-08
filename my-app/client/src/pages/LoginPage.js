@@ -14,20 +14,40 @@ function LoginPage({ onLogin }) {
   const navigate = useNavigate();
 
   const handleGoogleLogin = useGoogleLogin({
+
     onSuccess: async (tokenResponse) => {
-      setIsLoggingIn(true);
-      try {
-        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        if (!userInfoResponse.ok) throw new Error('Failed to fetch user info from Google');
-        const userInfo = await userInfoResponse.json();
-        await onLogin(userInfo); 
-      } catch (error) {
-        console.error("Error fetching user info from Google:", error);
-        setIsLoggingIn(false);
-      }
-    },
+  setIsLoggingIn(true);
+  try {
+    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+    });
+
+    if (!userInfoResponse.ok) throw new Error('Failed to fetch user info from Google');
+
+    const userInfo = await userInfoResponse.json();
+
+    // 🔽 Send to your backend for login/registration
+    const backendResponse = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userInfo })  // or send token instead if you validate on backend
+    });
+
+    if (!backendResponse.ok) throw new Error('Backend auth failed');
+
+    const session = await backendResponse.json(); // e.g., { user: {...}, token: '...' }
+
+    await onLogin(session.user);  // 🔁 Login success
+  } catch (error) {
+    console.error("Google Login Error:", error);
+    setIsLoggingIn(false);
+  }
+}
+
+    
+    ,
     onError: (errorResponse) => {
         console.error("Google Login Error:", errorResponse);
         setIsLoggingIn(false);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-// Import Page Components
+// Pages
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import AdvertisementPlanPage from './pages/AdvertisementPlanPage';
@@ -9,62 +10,46 @@ import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import MarketplacePage from './pages/MarketplacePage';
+import ChatPage from './pages/ChatPage';
 
 const GOOGLE_CLIENT_ID = "117194583119-ipg9t7ohp034hfapg6h0s3ohja0ajdbj.apps.googleusercontent.com";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('home');
-  const [pageData, setPageData] = useState({});
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [cart, setCart] = useState([]);
   const [isCartAnimating, setIsCartAnimating] = useState(false);
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('payment_intent')) {
-        setCurrentPage('order-success');
-    }
-  }, []);
 
   const handleLogout = useCallback(() => {
     setUser(null);
     setToken(null);
     setCart([]);
     localStorage.removeItem('token');
-    setCurrentPage('home'); 
   }, []);
 
   useEffect(() => {
-    const bootstrap = async () => {
-      if (token) {
-        try {
-          const decodedToken = JSON.parse(atob(token.split('.')[1]));
-          setUser({ id: decodedToken.id, name: decodedToken.name });
-          
-          const response = await fetch('http://localhost:8000/api/cart', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (response.ok) {
-            const cartData = await response.json();
+    if (token) {
+      try {
+        const decodedToken = JSON.parse(atob(token.split('.')[1]));
+        setUser({ id: decodedToken.id, name: decodedToken.name });
+
+        fetch('http://localhost:8000/api/cart', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+          .then(res => {
+            if (!res.ok) throw new Error();
+            return res.json();
+          })
+          .then(cartData => {
             const formattedCart = cartData.map(item => ({ ...item, name: item.productName }));
             setCart(formattedCart);
-          } else {
-            handleLogout();
-          }
-        } catch (error) {
-          console.error("Failed to initialize app state:", error);
-          handleLogout();
-        }
+          })
+          .catch(() => handleLogout());
+      } catch {
+        handleLogout();
       }
-    };
-    bootstrap();
+    }
   }, [token, handleLogout]);
-
-  const handleNavigation = useCallback((page, data = {}) => {
-      setPageData(data);
-      setCurrentPage(page);
-  }, []);
 
   const handleLogin = useCallback(async (googleUserInfo) => {
     try {
@@ -83,8 +68,6 @@ function App() {
       setUser(data.user);
       setToken(data.token);
       localStorage.setItem('token', data.token);
-      
-      setCurrentPage('home');
     } catch (error) {
       console.error("Error during backend authentication:", error);
     }
@@ -96,10 +79,7 @@ function App() {
   }, []);
 
   const handleAddToCart = useCallback(async (itemsToAdd) => {
-    if (!token) {
-        handleNavigation('login');
-        return;
-    }
+    if (!token) return;
     try {
       const response = await fetch('http://localhost:8000/api/cart', {
         method: 'POST',
@@ -117,8 +97,8 @@ function App() {
     } catch (error) {
       console.error("Error adding to cart:", error);
     }
-  }, [token, handleNavigation, triggerCartAnimation]);
-  
+  }, [token, triggerCartAnimation]);
+
   const handleUpdateCart = useCallback(async (itemName, newQuantity) => {
     if (!token) return;
     try {
@@ -131,46 +111,38 @@ function App() {
         body: JSON.stringify({ quantity: newQuantity }),
       });
       if (newQuantity <= 0) {
-          setCart(currentCart => currentCart.filter(item => item.name !== itemName));
+        setCart(currentCart => currentCart.filter(item => item.name !== itemName));
       } else {
-          setCart(currentCart => currentCart.map(item => item.name === itemName ? { ...item, quantity: newQuantity } : item));
+        setCart(currentCart => currentCart.map(item => item.name === itemName ? { ...item, quantity: newQuantity } : item));
       }
       triggerCartAnimation();
     } catch (error) {
-        console.error("Error updating cart:", error);
+      console.error("Error updating cart:", error);
     }
   }, [token, triggerCartAnimation]);
-  
+
   const handleOrderFinalized = useCallback(() => {
-      setCart([]);
+    setCart([]);
   }, []);
 
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const isAuthenticated = !!token;
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'login':
-        return <LoginPage onNavigate={handleNavigation} onLogin={handleLogin} />;
-      case 'advertisement':
-        return <AdvertisementPlanPage onNavigate={handleNavigation} onAddToCart={handleAddToCart} onUpdateCart={handleUpdateCart} cart={cart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} />;
-      case 'checkout':
-        return <CheckoutPage onNavigate={handleNavigation} cart={cart} onUpdateCart={handleUpdateCart} token={token} />;
-      case 'order-success':
-        return <OrderSuccessPage onNavigate={handleNavigation} token={token} onOrderFinalized={handleOrderFinalized} />;
-      case 'order-history':
-        return <OrderHistoryPage onNavigate={handleNavigation} token={token} />;
-      case 'marketplace':
-        return <MarketplacePage onNavigate={handleNavigation} token={token} user={user} />;
-      case 'home':
-      default:
-        return <HomePage onNavigate={handleNavigation} isAuthenticated={isAuthenticated} onLogout={handleLogout} onAddToCart={handleAddToCart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} user={user} />;
-    }
-  };
-
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      {renderPage()}
+      
+        <Routes>
+          <Route path="/" element={<Navigate to="/home" />} />
+          <Route path="/home" element={<HomePage isAuthenticated={isAuthenticated} onLogout={handleLogout} onAddToCart={handleAddToCart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} user={user} />} />
+          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+          <Route path="/advertisement" element={<AdvertisementPlanPage onAddToCart={handleAddToCart} onUpdateCart={handleUpdateCart} cart={cart} cartItemCount={cartItemCount} isCartAnimating={isCartAnimating} />} />
+          <Route path="/checkout" element={<CheckoutPage cart={cart} onUpdateCart={handleUpdateCart} token={token} />} />
+          <Route path="/order-success" element={<OrderSuccessPage token={token} onOrderFinalized={handleOrderFinalized} />} />
+          <Route path="/order-history" element={<OrderHistoryPage token={token} />} />
+          <Route path="/marketplace" element={<MarketplacePage token={token} user={user} />} />
+          <Route path="/chat/:sellerId" element={<ChatPage />} />
+        </Routes>
+      
     </GoogleOAuthProvider>
   );
 }

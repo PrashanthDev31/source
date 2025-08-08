@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from "react-router-dom";
 
 const SpinnerIcon = ({ color = 'text-white' }) => (
     <svg className={`animate-spin -ml-1 mr-3 h-5 w-5 ${color}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -29,7 +30,6 @@ const CameraModal = ({ onClose, onCapture }) => {
         if (!capturedImage) {
             startCamera();
         }
-
         return () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -107,6 +107,7 @@ function MarketplacePage({ onNavigate, token, user }) {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
 
+    const navigate = useNavigate();
     const isFormValid = title && location && price && imageFiles.length > 0;
 
     const fetchListings = async (query = '') => {
@@ -146,8 +147,7 @@ function MarketplacePage({ onNavigate, token, user }) {
             onNavigate('login');
             return;
         }
-        // Placeholder for future chat implementation
-        alert("Chat functionality is coming soon!");
+        navigate(`/chat/${listing.sellerId}`, { state: { sellerName: listing.sellerName } });
     };
 
     const handleCreateListing = async (e) => {
@@ -210,9 +210,9 @@ function MarketplacePage({ onNavigate, token, user }) {
             {showCamera && <CameraModal onClose={() => setShowCamera(false)} onCapture={handleCameraCapture} />}
             <header className="bg-white shadow-sm">
                 <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-                    <button onClick={() => onNavigate('home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
+                    <button onClick={() => navigate('/home')} className="text-purple-600 hover:text-purple-800 font-semibold">&larr; Back to Home</button>
                     {token && (
-                         <button onClick={() => setShowCreateForm(!showCreateForm)} className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition-colors">
+                        <button onClick={() => setShowCreateForm(!showCreateForm)} className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition-colors">
                             {showCreateForm ? 'Cancel' : '+ Create Listing'}
                         </button>
                     )}

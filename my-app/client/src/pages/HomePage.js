@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from "react-router-dom";
 
 const Logo = () => (
     <div className="flex items-center space-x-3">
@@ -11,6 +12,7 @@ const Logo = () => (
     </div>
 );
 
+
 const SpinnerIcon = ({ color = 'text-white' }) => (
     <svg className={`animate-spin -ml-1 mr-3 h-5 w-5 ${color}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -18,8 +20,10 @@ const SpinnerIcon = ({ color = 'text-white' }) => (
     </svg>
 );
 
-function HomePage({ onNavigate, isAuthenticated, onLogout, onAddToCart, cartItemCount, isCartAnimating, user }) {
+function HomePage({  isAuthenticated, onLogout, onAddToCart, cartItemCount, isCartAnimating, user }) {
   const [loadingProduct, setLoadingProduct] = useState(null);
+  const navigate = useNavigate();
+
   const catalogCategories = [ 'All Listings', 'Insurance', 'Spiritual And Astrology', 'Media Tv Newspapers', 'Catering', 'Party Rental', 'Home Remodeling', 'Meditation And Yoga', 'Childrens Education', 'Religious', 'Clothing', 'Driving School', 'Mortgages', 'Tax Preparers', 'Training IT And Others', 'Bridal Shop', 'Community Associations', 'Travel Agents', 'Martial Arts', 'Flower Shops', 'Groceries', 'Beauty', 'Attorneys And Immigration', 'Courier', 'Priests', 'Senior Living', 'Furniture', 'Real Estate Brokers', 'Hospitals', 'Visual Arts', 'Wedding And Matrimonial', 'Jewelry', 'Miscellaneous', 'Physicians', 'Information Technology', 'Home Appliances Goods', 'Sports Pub', 'Dentistry', 'Sports', 'Performing Arts', 'Sweet And Savour Shops', 'Restaurants' ];
   const columns = [[], [], [], []];
   catalogCategories.forEach((category, index) => { columns[index % 4].push(category); });
@@ -37,11 +41,11 @@ function HomePage({ onNavigate, isAuthenticated, onLogout, onAddToCart, cartItem
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-8">
-            <a href="#" onClick={() => onNavigate('home')}>
+            <a href="#" onClick={() => navigate('/home')}>
                 <Logo />
             </a>
             <div className="hidden md:flex items-center space-x-6">
-              <a href="#" onClick={() => onNavigate('home')} className="nav-link-active font-semibold">Home</a>
+              <a href="#" onClick={() => navigate('/home')} className="nav-link-active font-semibold">Home</a>
               
               <div className="relative group">
                 <a href="#" className="nav-link flex items-center">Catalog<svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></a>
@@ -61,7 +65,7 @@ function HomePage({ onNavigate, isAuthenticated, onLogout, onAddToCart, cartItem
                     </div>
                     <div className="border-l pl-8 ml-8">
                         <h3 className="text-lg font-bold text-gray-800 mb-4">Community</h3>
-                        <a href="#" onClick={() => onNavigate('marketplace')} className="block p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+                        <a href="#" onClick={() => navigate('/marketplace')} className="block p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
                             <p className="font-bold text-purple-700">🛍️ Desi Marketplace</p>
                             <p className="text-sm text-gray-600">Buy & sell used goods in the community.</p>
                         </a>
@@ -79,19 +83,19 @@ function HomePage({ onNavigate, isAuthenticated, onLogout, onAddToCart, cartItem
             {isAuthenticated ? (
               <div className="hidden md:flex items-center gap-4">
                 <span className="text-gray-700 font-medium">Welcome, {user?.name.split(' ')[0]}</span>
-                <a href="#" onClick={() => onNavigate('order-history')} className="text-sm text-purple-600 hover:underline">Order History</a>
+                <a href="#" onClick={() => navigate('/order-history')} className="text-sm text-purple-600 hover:underline">Order History</a>
                 <button onClick={onLogout} className="flex items-center text-gray-600 hover:text-purple-600">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                   <span className="ml-2 font-medium">Sign Out</span>
                 </button>
               </div>
             ) : (
-              <a href="#" onClick={() => onNavigate('login')} className="hidden md:flex items-center text-gray-600 hover:text-purple-600">
+              <a href="#" onClick={() => navigate('/login')} className="hidden md:flex items-center text-gray-600 hover:text-purple-600">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 <span className="ml-2 font-medium">Login</span>
               </a>
             )}
-            <button onClick={() => onNavigate('checkout')} className={`relative hidden md:block ${isCartAnimating ? 'cart-shake' : ''}`}>
+            <button onClick={() => navigate('/checkout')} className={`relative hidden md:block ${isCartAnimating ? 'cart-shake' : ''}`}>
                 <svg className="h-7 w-7 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 {cartItemCount > 0 && <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{cartItemCount}</span>}
             </button>
@@ -104,7 +108,7 @@ function HomePage({ onNavigate, isAuthenticated, onLogout, onAddToCart, cartItem
             <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">“Bridging cultures, building dreams.”</h1>
           </div>
           <div className="md:w-1/2">
-             <a href="#" onClick={() => onNavigate('advertisement')} className="block rounded-lg shadow-xl overflow-hidden transform transition-transform hover:scale-105">
+             <a href="#" onClick={() => navigate('/advertisement')} className="block rounded-lg shadow-xl overflow-hidden transform transition-transform hover:scale-105">
                 <img src="https://placehold.co/600x400/A78BFA/FFFFFF?text=Feature+your+business+with+Advertisement+Plan" alt="Feature your business with Advertisement Plan" className="w-full" />
              </a>
           </div>

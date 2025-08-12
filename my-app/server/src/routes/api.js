@@ -350,8 +350,8 @@ router.post('/marketplace', authenticateToken, async (req, res) => {
 router.get('/messages/:otherUserId', authenticateToken, async (req, res) => {
     try {
         const { otherUserId } = req.params;
-        const userId = req.user.id;
-        const roomId = [userId, otherUserId].sort().join("_");
+        const userId = String(req.user.id); // CHANGE: ensure string to match hiddenFor storage
+        const roomId = [userId, String(otherUserId)].sort().join("_"); // CHANGE
         const messages = await Message.find({
             room: roomId,
             hiddenFor: { $ne: userId }
@@ -369,18 +369,20 @@ router.get('/conversations', authenticateToken, async (req, res) => {
 
         // Use the MongoDB Aggregation Pipeline to get the last message for each chat room
         const conversations = await Message.aggregate([
-            // Find all messages where the current user is either the sender or receiver
-            { $match: { $or: [{ senderId: userId }, { receiverId: userId }] } },
-            // Sort messages within each room to get the most recent one first
+            // CHANGE: exclude messages hidden for this user (so cleared chats disappear)
+            { $match: { 
+                $and: [
+                  { hiddenFor: { $ne: userId } },                  // CHANGE
+                  { $or: [{ senderId: userId }, { receiverId: userId }] }
+                ]
+            }},
             { $sort: { sentAt: -1 } },
-            // Group by the room ID to get the last message for each conversation
             { 
                 $group: { 
                     _id: "$room",
                     lastMessage: { $first: "$$ROOT" }
                 } 
             },
-            // Sort the conversations themselves by the last message's date
             { $sort: { "lastMessage.sentAt": -1 } }
         ]);
 
@@ -392,7 +394,6 @@ router.get('/conversations', authenticateToken, async (req, res) => {
             const lastMsg = convo.lastMessage;
             const otherUserId = lastMsg.senderId === userId ? lastMsg.receiverId : lastMsg.senderId;
             
-            // Query the SQL 'users' table for the other user's name
             const userResult = await pool.request()
                 .input('userId', sql.Int, parseInt(otherUserId))
                 .query('SELECT name FROM users WHERE id = @userId');
@@ -432,6 +433,27 @@ router.post('/messages', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error("Error sending message:", err);
         res.status(500).json({ error: 'Failed to send message' });
+    }
+});
+
+// CHANGE: NEW — Delete chat (for me) via REST (used by Inbox "Delete chat" button)
+router.post('/chats/clear-for-me', authenticateToken, async (req, res) => {
+    try {
+        const { otherUserId } = req.body;
+        if (!otherUserId) return res.status(400).json({ message: 'otherUserId required' });
+
+        const userId = String(req.user.id); // ensure string
+        const roomId = [userId, String(otherUserId)].sort().join("_");
+
+        await Message.updateMany(
+            { room: roomId, hiddenFor: { $ne: userId } },
+            { $push: { hiddenFor: userId } }
+        );
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('clear-for-me API error:', err);
+        res.status(500).json({ message: 'Failed to delete chat' });
     }
 });
 

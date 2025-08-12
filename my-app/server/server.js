@@ -1,7 +1,8 @@
 // server.js (updated)
 // - Adds clientId echo for optimistic UI reconciliation
 // - Defensive room join inside send_message
-// - Otherwise keeps your original logic intact
+// - CHANGE: soft_delete_message now emits a minimal plain object {_id, deleted, text} so all clients update reliably
+// - Wrapped handlers with try/catch where useful
 
 require('dotenv').config();
 const express = require('express');
@@ -151,7 +152,47 @@ io.on("connection", async (socket) => {
     }
   });
 
-  // Bulk mark as read
+  // Soft delete (delete for everyone)
+  socket.on("soft_delete_message", async (msgId) => {
+    try {
+      const msg = await Message.findById(msgId);
+      if (!msg) return;
+
+      // (Optional) only allow the sender to delete for everyone:
+      // if (String(msg.senderId) !== String(socket.user.id)) return;
+
+      msg.deleted = true;
+      msg.text = "This message was deleted";
+      await msg.save();
+
+      // CHANGE: emit a minimal, plain payload to avoid client mismatch
+      const update = {
+        _id: String(msg._id),           // CHANGE
+        deleted: true,                  // CHANGE
+        text: "This message was deleted"// CHANGE
+      };
+
+      io.to(msg.room).emit("message_updated", update); // everyone in the room
+    } catch (e) {
+      console.error('soft_delete_message error:', e);
+    }
+  });
+
+  // One-sided delete (delete for me)
+  socket.on("one_sided_delete", async (msgId) => {
+    try {
+      const msg = await Message.findById(msgId);
+      if (!msg) return;
+      if (!msg.hiddenFor.includes(userId)) {
+        msg.hiddenFor.push(userId);
+        await msg.save();
+      }
+      socket.emit("message_hidden", msgId);
+    } catch (e) {
+      console.error('one_sided_delete error:', e);
+    }
+  });
+
   socket.on("mark_chat_as_read", async ({ otherUserId }) => {
     try {
       const roomId = [userId, otherUserId].sort().join("_");
@@ -178,35 +219,6 @@ io.on("connection", async (socket) => {
       }
     } catch (e) {
       console.error('mark_chat_as_read error:', e);
-    }
-  });
-
-  // Soft delete (delete for everyone)
-  socket.on("soft_delete_message", async (msgId) => {
-    try {
-      const msg = await Message.findById(msgId);
-      if (!msg) return;
-      msg.deleted = true;
-      msg.text = "This message was deleted";
-      await msg.save();
-      io.to(msg.room).emit("message_updated", msg);
-    } catch (e) {
-      console.error('soft_delete_message error:', e);
-    }
-  });
-
-  // One-sided delete (delete for me)
-  socket.on("one_sided_delete", async (msgId) => {
-    try {
-      const msg = await Message.findById(msgId);
-      if (!msg) return;
-      if (!msg.hiddenFor.includes(userId)) {
-        msg.hiddenFor.push(userId);
-        await msg.save();
-      }
-      socket.emit("message_hidden", msgId);
-    } catch (e) {
-      console.error('one_sided_delete error:', e);
     }
   });
 

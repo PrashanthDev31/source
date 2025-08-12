@@ -1,3 +1,5 @@
+// ChatPage.js
+// CHANGE: add clientId-based optimistic UI with reconciliation (no duplicates).
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import io from "socket.io-client";
@@ -7,23 +9,19 @@ function ChatPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const sellerName = location.state?.sellerName || "Seller";
-  const [socket, setSocket] = useState(null);
+  const otherUserName = location.state?.sellerName || "User";
+  const socketRef = useRef(null); // (kept) useRef for socket
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [typingUserId, setTypingUserId] = useState(null);
   const messagesEndRef = useRef(null);
 
   const token = localStorage.getItem("token");
   const user = token ? JSON.parse(atob(token.split(".")[1])) : null;
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, typingUserId]);
 
   useEffect(() => {
     if (!token) {
@@ -31,107 +29,158 @@ function ChatPage() {
       return;
     }
 
-    const s = io("http://localhost:8000", {
-      auth: { token }
+    const socket = io("http://localhost:8000", { auth: { token } });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("join_room", { otherUserId: sellerId });
     });
 
-    setSocket(s);
-
-    s.on("connect", () => {
-      s.emit("join_room", { otherUserId: sellerId });
-    });
-
+    // initial history
     fetch(`http://localhost:8000/api/messages/${sellerId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => setMessages(data))
       .catch((err) => console.error("Error loading messages:", err));
 
-    s.on("receive_message", (msg) => {
-      setMessages((prev) => [...prev, msg]);
-    });
+    // CHANGE: reconcile echoed messages using clientId (replace optimistic, don't append)
+    const onReceive = (msg) => {
+      setMessages((prev) => {
+        if (msg.clientId) {
+          const i = prev.findIndex(
+            (m) =>
+              String(m._id) === String(msg.clientId) ||
+              String(m.clientId) === String(msg.clientId)
+          );
+          if (i !== -1) {
+            const copy = [...prev];
+            copy[i] = { ...copy[i], ...msg, optimistic: false, _id: msg._id };
+            return copy;
+          }
+        }
+        return [...prev, msg];
+      });
+    };
 
-    s.on("user_typing", () => setIsTyping(true));
-    s.on("user_stop_typing", () => setIsTyping(false));
+    const onTyping = ({ userId }) => setTypingUserId(userId);
+    const onStopTyping = () => setTypingUserId(null);
+
+    socket.on("receive_message", onReceive);
+    socket.on("user_typing", onTyping);
+    socket.on("user_stop_typing", onStopTyping);
 
     return () => {
-      s.disconnect();
+      socket.off("receive_message", onReceive);
+      socket.off("user_typing", onTyping);
+      socket.off("user_stop_typing", onStopTyping);
+      socket.disconnect();
     };
   }, [sellerId, token, navigate]);
 
   const sendMessage = () => {
-    if (!socket || !newMessage.trim()) return;
-    const optimisticMessage = { 
-      senderId: user?.id.toString(), // Ensure IDs are strings for comparison
-      text: newMessage, 
-      sentAt: new Date().toISOString() 
+    const s = socketRef.current;
+    if (!s || !newMessage.trim()) return;
+
+    // CHANGE: create a clientId and use it for optimistic message & reconciliation
+    const clientId = "c-" + Date.now();
+
+    const optimistic = {
+      _id: clientId, // CHANGE: temporary id equals clientId
+      clientId, // CHANGE: carry clientId
+      room: [user?.id, sellerId].sort().join("_"),
+      senderId: String(user?.id),
+      receiverId: String(sellerId),
+      text: newMessage,
+      sentAt: new Date().toISOString(),
+      optimistic: true,
     };
-    socket.emit("send_message", { otherUserId: sellerId, text: newMessage });
-    setMessages((prev) => [...prev, optimisticMessage]);
+    setMessages((prev) => [...prev, optimistic]);
+
+    // CHANGE: include clientId in emit so server echoes it back
+    s.emit("send_message", { otherUserId: sellerId, text: newMessage, clientId });
     setNewMessage("");
+    s.emit("stop_typing", { otherUserId: sellerId });
   };
 
-  const handleTyping = () => {
-    if (!socket) return;
-    socket.emit("typing", { otherUserId: sellerId });
-  };
-
-  const handleStopTyping = () => {
-    if (!socket) return;
-    socket.emit("stop_typing", { otherUserId: sellerId });
-  };
+  const handleTyping = () =>
+    socketRef.current?.emit("typing", { otherUserId: sellerId });
+  const handleStopTyping = () =>
+    socketRef.current?.emit("stop_typing", { otherUserId: sellerId });
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
       <header className="bg-purple-600 text-white p-4 flex items-center shadow-md">
         <button
           onClick={() => navigate(-1)}
-          className="mr-4 p-2 rounded-full hover:bg-purple-700 transition-colors"
+          className="mr-4 p-2 rounded-full hover:bg-purple-700"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
           </svg>
         </button>
-        <h1 className="text-xl font-bold">{sellerName}</h1>
+        <h1 className="text-xl font-bold">{otherUserName}</h1>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, idx) => (
-          // --- THIS IS THE CORRECTED SECTION ---
-          // Wrap each message in a flex container
-          <div key={idx} className={`flex ${msg.senderId == user?.id ? "justify-end" : "justify-start"}`}>
-            {/* The message bubble itself */}
+          <div
+            key={msg._id || idx}
+            className={`flex ${
+              String(msg.senderId) === String(user?.id)
+                ? "justify-end"
+                : "justify-start"
+            }`}
+          >
             <div
-              className={`py-2 px-4 rounded-2xl max-w-md md:max-w-lg ${
-                msg.senderId == user?.id
+              className={`py-2 px-4 rounded-2xl max-w-md ${
+                String(msg.senderId) === String(user?.id)
                   ? "bg-purple-600 text-white"
                   : "bg-white text-gray-800 shadow-sm"
               }`}
+              style={msg.optimistic ? { opacity: 0.6 } : undefined}
             >
               <p>{msg.text}</p>
             </div>
           </div>
         ))}
-        {isTyping && <p className="text-sm italic text-gray-500">Seller is typing...</p>}
-        <div ref={messagesEndRef}></div>
+
+        {typingUserId && String(typingUserId) !== String(user?.id) && (
+          <div className="flex justify-start">
+            <div className="py-2 px-4 rounded-2xl bg-white text-gray-500 shadow-sm">
+              <p className="italic">{otherUserName} is typing...</p>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-      <div className="flex p-3 bg-white border-t border-gray-200">
+      <div className="flex p-3 bg-white border-t">
         <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onFocus={handleTyping}
           onBlur={handleStopTyping}
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Type a message..."
-          className="flex-1 border rounded-lg px-4 py-2 mr-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="flex-1 border rounded-lg px-4 py-2 mr-3"
         />
         <button
           onClick={sendMessage}
-          disabled={!socket || !newMessage.trim()}
-          className="bg-purple-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
+          disabled={!newMessage.trim()}
+          className="bg-purple-600 text-white px-6 py-2 rounded-lg font-semibold"
         >
           Send
         </button>
